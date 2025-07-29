@@ -3,7 +3,6 @@ process MACSYFINDER {
 
     input:
     tuple val(accession), val(experiment), val(biome), path(assembly), path(faa)
-    val (targetmodel)
     val (modelpath)
     val (model)
     val (nbmodel)
@@ -16,24 +15,30 @@ process MACSYFINDER {
     script:
     """
     if [ "$model" == "TXSScan" ]; then
-        macsydata install --target "$targetmodel" TXSScan
+        macsydata install --target /proj/dig_zb/sieve/models TXSScan
     elif [ "$model" == "TFFscan" ]; then
-        macsydata install --target "$targetmodel"  TFFscan
+        macsydata install -u TFFscan
     elif [ "$model" == "CONJscan" ]; then
-        macsydata install --target "$targetmodel"  CONJscan
+        macsydata install -u CONJscan
     elif [ "$model" == "CasFinder" ]; then
-        macsydata install --target "$targetmodel"  CasFinder
+        macsydata install -u CasFinder
     else
-        cp -r "$modelpath" "$targetmodel" 
+        cp -r "$modelpath" /proj/dig_zb/sieve/models
     fi
 
     result_file="macsyfinder_results.tsv"
 
+    # Dataframe to save all accession value
+    suffix_array=()
+
     # Execute MacSyfinder
     mkdir -p 'out_macsyfinder' || exit 1
 
+    suffix_array+=("$accession")
+
     macsyfinder \
     --db-type ordered_replicon \
+    --models-dir /proj/dig_zb/sieve/models \
     --models "$model" "$nbmodel" \
     --profile-suffix .hmm \
     --sequence-db "$faa" \

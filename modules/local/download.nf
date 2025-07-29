@@ -1,4 +1,6 @@
 process DOWNLOAD {
+    maxForks 10  // limit to 5 concurrent instances
+
     tag "$accession"
 
     input:
@@ -64,7 +66,7 @@ process DOWNLOAD {
         else:
             print(f"No files to concatenate for accession {accession}.")
 
-    # Usage
+    # Example usage
     with Session(API_BASE) as session:
         download_and_concatenate(session, accession, experiment)
     

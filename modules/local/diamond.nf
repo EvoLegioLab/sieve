@@ -20,7 +20,7 @@ process DIAMOND {
     file_path="$reads"
 
     # Execute diamond blastx
-    diamond blastx -q "$reads" --db "$ref_db" -f 100 --unal 0 --id 85 -e 1e-6 --out "$accession".daa --threads "$task.cpus"
+    diamond blastx -q "$reads" --db "$ref_db" -f 100 --unal 0 --id \$diamond_id -e \$diamond_evalue --out "$accession".daa --threads "$task.cpus" 
 
     # Check number of alignments in DAA file
     align_count=\$(diamond view --daa "$accession".daa | wc -l)

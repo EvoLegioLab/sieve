@@ -1,6 +1,6 @@
 process CONTIGS_ANNOTATION { 
-    publishDir "$params.resultsDir/contigs_annotation/", pattern: "*.faa"
     publishDir "$params.resultsDir/contigs_annotation/", pattern: "*.txt"
+    publishDir "$params.resultsDir/contigs_annotation/", pattern: "*.faa"
     tag "$accession"
 
     input:
