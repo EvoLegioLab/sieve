@@ -1,5 +1,5 @@
 process TAXONOMY {
-    maxForks 10  // limit to 5 concurrent instances
+    maxForks 10  // limit to 10 concurrent instances
 
     publishDir "$params.resultsDir/taxonomy", pattern: "*_taxonomy_details.csv"
     tag "$accession"
@@ -33,11 +33,8 @@ process TAXONOMY {
     from urllib.request import urlretrieve
     from jsonapi_client import Session, Filter
 
-<<<<<<< HEAD
-=======
     from jsonapi_client import Filter, Session
 
->>>>>>> master
     API_BASE = "https://www.ebi.ac.uk/metagenomics/api/v1"
 
     ## Parse options
@@ -156,8 +153,4 @@ process TAXONOMY {
         print("No CSV file created as all counts are equal to zero.")
 
     """
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> master

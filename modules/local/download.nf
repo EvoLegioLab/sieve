@@ -1,5 +1,5 @@
 process DOWNLOAD {
-    maxForks 10  // limit to 5 concurrent instances
+    maxForks 10  // limit to 10 concurrent instances
 
     tag "$accession"
 
@@ -15,7 +15,6 @@ process DOWNLOAD {
     #!/usr/bin/env python
     # -*- coding: utf-8 -*-
 
-    ## Libraries 
     import os
     from urllib.request import urlretrieve
     from jsonapi_client import Session
@@ -35,41 +34,63 @@ process DOWNLOAD {
         else:
             label = None
 
+        print(f"DEBUG: Starting download for accession '{accession}' with experiment type '{experiment}'")
+        print(f"DEBUG: Looking for files with label '{label}' and format 'FASTA'")
+
         file_list = []
-        for download in session.iterate(f"analyses/{accession}/downloads"):
-            if (label and download.description.label == label
-                    and
-                    download.file_format.name == 'FASTA'):
+        try:
+            downloads = list(session.iterate(f"analyses/{accession}/downloads"))
+            print(f"DEBUG: Found {len(downloads)} download entries for accession {accession}")
+        except Exception as e:
+            print(f"ERROR: Could not retrieve downloads list for accession {accession}: {e}")
+            downloads = []
+
+        for download in downloads:
+            print(f"DEBUG: Found download entry - label: '{download.description.label}', format: '{download.file_format.name}', alias: '{download.alias}'")
+            if label and download.description.label == label and download.file_format.name == 'FASTA':
                 try:
-                    local_file = "{}.fastq.gz".format(download.alias)
-                    print(f"Downloading file for {accession}:", download.alias)
+                    local_file = f"{download.alias}.fastq.gz"
+                    print(f"DEBUG: Downloading file '{download.alias}' for accession '{accession}' to '{local_file}'")
                     urlretrieve(download.links.self.url, local_file)
-                    file_list.append(local_file)
+                    if os.path.exists(local_file):
+                        print(f"DEBUG: Successfully downloaded '{local_file}'")
+                        file_list.append(local_file)
+                    else:
+                        print(f"WARNING: File '{local_file}' does not exist after download attempt")
                 except Exception as e:
-                    print(f'Error for {accession}: {str(e)}')
+                    print(f"ERROR: Failed to download file '{download.alias}' for accession '{accession}': {e}")
 
-        # Concatenate files for the analysis
-        if file_list:
-            try:
-                output_file = "{}.fastq.gz".format(accession)
-                cat_command = "cat {} > {}".format(" ".join(file_list), output_file)
-                os.system(cat_command)
-
-                # Remove individual files
-                for file in file_list:
-                    rm_command = "rm {}".format(file)
-                    os.system(rm_command)
-
-                print(f"Concatenation and removal completed for accession {accession}.")
-            except Exception as e:
-                print(f'Error during concatenation for accession {accession}: {str(e)}')
+        if not file_list:
+            print(f"WARNING: No matching files downloaded for accession '{accession}'. Nothing to concatenate.")
         else:
-            print(f"No files to concatenate for accession {accession}.")
+            try:
+                output_file = f"{accession}.fastq.gz"
+                print(f"DEBUG: Concatenating {len(file_list)} files into '{output_file}'")
+                cat_command = "cat {} > {}".format(" ".join(file_list), output_file)
+                ret = os.system(cat_command)
+                if ret != 0:
+                    print(f"WARNING: Concatenation command exited with code {ret}")
 
-    # Example usage
-    with Session(API_BASE) as session:
-        download_and_concatenate(session, accession, experiment)
-    
-    print("Done")
+                # Clean up individual files
+                for f in file_list:
+                    try:
+                        os.remove(f)
+                        print(f"DEBUG: Removed temporary file '{f}'")
+                    except Exception as e:
+                        print(f"WARNING: Could not remove temporary file '{f}': {e}")
+
+                print(f"DEBUG: Concatenation and cleanup completed for accession '{accession}'.")
+            except Exception as e:
+                print(f"ERROR: Error during concatenation for accession '{accession}': {e}")
+
+    if __name__ == "__main__":
+        print("DEBUG: Opening session to EBI Metagenomics API")
+        try:
+            with Session(API_BASE) as session:
+                download_and_concatenate(session, accession, experiment)
+        except Exception as e:
+            print(f"ERROR: Could not open session or complete downloads for accession '{accession}': {e}")
+
+        print("DEBUG: Download process finished for accession '{accession}'")
     """
 }

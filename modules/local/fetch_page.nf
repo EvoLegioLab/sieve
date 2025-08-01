@@ -1,7 +1,6 @@
 process FETCH_PAGE {
 
-    maxForks 10  // limit to 5 concurrent instances
-
+    maxForks 5
     publishDir "${params.resultsDir}/accession", mode: 'copy'
 
     input:
@@ -14,39 +13,48 @@ process FETCH_PAGE {
     """
     #!/usr/bin/env python3
 
-    import csv
-    import requests
-    import sys
-    import time
-    import json
+    import csv, requests, time, sys
 
     url = "$page_url"
-
-    # Derive output file name from URL
     page_number = url.split("page=")[-1].split("&")[0] if "page=" in url else "1"
     output_file = f"page_{page_number}.csv"
 
+    def retry_get(url, retries=10, delay=10):
+        for i in range(retries):
+            try:
+                sys.stderr.write(f"Attempt {i+1}/{retries} for URL: {url}\\n")
+                response = requests.get(url, timeout=30)
+                if response.status_code == 200:
+                    return response
+                else:
+                    sys.stderr.write(f"Non-200 response ({response.status_code}) for URL: {url}\\n")
+            except requests.RequestException as e:
+                sys.stderr.write(f"Retrying ({i+1}/{retries}) after error: {e}\\n")
+            time.sleep(delay * (i + 1))  # Exponential backoff
+        raise Exception(f"ERROR: Failed to fetch URL after {retries} retries: {url}")
+
     def fetch_sample_biome(sample_id):
+        sample_url = f"https://www.ebi.ac.uk/metagenomics/api/v1/samples/{sample_id}"
         try:
-            sample_url = f"https://www.ebi.ac.uk/metagenomics/api/v1/samples/{sample_id}"
-            response = requests.get(sample_url)
-            if response.status_code == 200:
-                data = response.json()
-                return data.get('data', {}).get('relationships', {}).get('biome', {}).get('data', {}).get('id', 'N/A')
-            else:
-                return 'N/A'
-        except Exception:
-            return 'N/A'
+            response = retry_get(sample_url)
+            data = response.json()
+            return data.get('data', {}).get('relationships', {}).get('biome', {}).get('data', {}).get('id', 'N/A')
+        except Exception as e:
+            sys.stderr.write(f"Failed to fetch biome for sample {sample_id}: {e}\\n")
+            return "N/A"
 
     def fetch_and_write(url, output_file):
+        try:
+            response = retry_get(url)
+            data = response.json().get("data", [])
+        except Exception as e:
+            sys.stderr.write(f"Failed to fetch or parse data from {url}: {e}\\n")
+            sys.exit(1)
+
         with open(output_file, mode='w', newline='') as csvfile:
             fieldnames = ["accession", "version", "experiment", "biome"]
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
-
-            response = requests.get(url)
-            response.raise_for_status()
-            data = response.json().get("data", [])
 
             for entry in data:
                 attributes = entry.get("attributes", {})
@@ -59,7 +67,6 @@ process FETCH_PAGE {
                     "experiment": attributes.get("experiment-type", "N/A"),
                     "biome": fetch_sample_biome(sample_id) if sample_id else "N/A"
                 }
-
                 writer.writerow(row)
 
     fetch_and_write(url, output_file)

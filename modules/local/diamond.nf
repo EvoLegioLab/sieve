@@ -10,26 +10,35 @@ process DIAMOND {
     output:
     tuple val(accession), val(experiment), val(biome), path(reads), path("*.daa"), optional: true
 
-    script:
-    """
-    #Input
-    ref_db="$ref_db"
-    cpus="$cpus"
-    diamond_min_align_reads="$min_align_reads"
-    accession="$accession"
-    file_path="$reads"
+script:
+def reads_name   = reads.getName()
+def ref_db_name  = ref_db.getName()
 
-    # Execute diamond blastx
-    diamond blastx -q "$reads" --db "$ref_db" -f 100 --unal 0 --id \$diamond_id -e \$diamond_evalue --out "$accession".daa --threads "$task.cpus" 
+def diamond_cmd = [
+    'diamond blastx',
+    "-q ${reads_name}",
+    "--db ${ref_db_name}",
+    "--out ${accession}.daa",
+    "--threads ${cpus}"
+]
 
-    # Check number of alignments in DAA file
-    align_count=\$(diamond view --daa "$accession".daa | wc -l)
-
-    if [ ! "\$align_count" -gt "$min_align_reads" ]; then
-        rm "$accession".daa
-    fi
-
-    """
+if (params.user_diamond_options && params.user_diamond_options.trim()) {
+    diamond_cmd << params.user_diamond_options.trim()
+} else {
+    diamond_cmd << "-f 100 --unal 0 --id 85 -e 1e-6"
 }
 
+"""
+# Run DIAMOND
+${diamond_cmd.join(' ')}
 
+# Filter by minimum alignment count
+if [ -f "${accession}.daa" ]; then
+    align_count=\$(diamond view --daa "${accession}.daa" | wc -l)
+    if [ "\$align_count" -le "${min_align_reads}" ]; then
+        echo "Fewer than ${min_align_reads} alignments — removing output."
+        rm "${accession}.daa"
+    fi
+fi
+"""
+}
