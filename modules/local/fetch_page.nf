@@ -43,7 +43,7 @@ process FETCH_PAGE {
             sys.stderr.write(f"Failed to fetch biome for sample {sample_id}: {e}\\n")
             return "N/A"
 
-    def fetch_and_write(url, output_file):
+    def fetch_and_write(url, output_file, retries=20, delay=10):
         try:
             response = retry_get(url)
             data = response.json().get("data", [])
