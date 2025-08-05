@@ -79,7 +79,13 @@ workflow SIEVE {
     //MODULE: Diamond
 
     if (!params.nodiamond){
-        DIAMOND_DB(params.genes) 
+	
+	// Define input channel
+	fasta_files_ch = Channel.fromPath("${params.genes}/*.fasta", checkIfExists: true).collect()
+
+	// Use it in the diamond_db process
+	DIAMOND_DB(fasta_files_ch)
+ 
         DIAMOND(ch_reads, DIAMOND_DB.out, params.cpus, params.diamond_min_align_reads)
         ch_pre_assembly = DIAMOND.out.map { row -> [row[0], row[1], row[2], row[3]] }
         //ch_pre_assembly.view()

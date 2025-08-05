@@ -12,7 +12,8 @@ process GENERATE_PAGE_URLS {
     val instrument_model
     val pipeline_version
     val page_size
-
+    path generate_urls_py
+    
     output:
     path "page_urls.txt"
 
@@ -29,7 +30,7 @@ export INSTRUMENT_MODEL="${instrument_model == null || instrument_model == 'null
 export PIPELINE_VERSION="${pipeline_version == null || pipeline_version == 'null' ? '' : pipeline_version}"
 export PAGE_SIZE="${page_size == null || page_size == 'null' ? '100' : page_size}"
 
-python3 ../../../scripts/generate_urls.py
+python3 ${generate_urls_py}
 
 echo "Files in current dir:"
 ls -l

@@ -31,7 +31,8 @@ workflow MGNIFY {
         params.instrument_platform,
         params.instrument_model,
         params.pipeline_version,
-        params.page_size
+        params.page_size,
+	file('scripts/generate_urls.py')
     )
 
     // Read all lines from the emitted file as individual URLs

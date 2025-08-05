@@ -1,14 +1,17 @@
 process DIAMOND_DB {
 
+    tag "${task.hash}"
+
     input:
-    val genes
+    path fasta_files
 
     output:
-    file 'references.dmnd'
+    path "references.dmnd"
 
     script:
-      """
-      cat "$genes"*.fasta > references.fasta
-      diamond makedb --in references.fasta --db references.dmnd
-      """
+    """
+    cat ${fasta_files.join(' ')} > references.fasta
+    diamond makedb --in references.fasta --db references.dmnd
+    """
 }
+

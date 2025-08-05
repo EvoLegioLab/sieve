@@ -11,8 +11,12 @@ process DIAMOND {
     tuple val(accession), val(experiment), val(biome), path(reads), path("*.daa"), optional: true
 
 script:
-def reads_name   = reads.getName()
+def reads_name = (reads instanceof List)
+    ? reads.collect { it.getName() }.join(' ')
+    : reads.getName()
+
 def ref_db_name  = ref_db.getName()
+
 
 def diamond_cmd = [
     'diamond blastx',
