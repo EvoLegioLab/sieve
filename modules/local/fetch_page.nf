@@ -19,7 +19,7 @@ process FETCH_PAGE {
     page_number = url.split("page=")[-1].split("&")[0] if "page=" in url else "1"
     output_file = f"page_{page_number}.csv"
 
-    def retry_get(url, retries=10, delay=10):
+    def retry_get(url, retries=20, delay=10):
         for i in range(retries):
             try:
                 sys.stderr.write(f"Attempt {i+1}/{retries} for URL: {url}\\n")

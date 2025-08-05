@@ -2,10 +2,10 @@ process DIAMOND {
     tag "$accession"
 
     input:
-    tuple val(accession), val(experiment), val(biome), path(reads)
-    file ref_db
-    val cpus
-    val min_align_reads
+      tuple val(accession), val(experiment), val(biome), path(reads)
+      file ref_db
+      val cpus
+      val min_align_reads
 
     output:
     tuple val(accession), val(experiment), val(biome), path(reads), path("*.daa"), optional: true
@@ -43,6 +43,7 @@ if [ -f "${accession}.daa" ]; then
         echo "Fewer than ${min_align_reads} alignments — removing output."
         rm "${accession}.daa"
     fi
-fi
-"""
+    """
+
+
 }

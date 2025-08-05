@@ -28,7 +28,7 @@
 */
 
 //
-// SUBWORKFLOW: Builded from local
+// SUBWORKFLOW: Built from local
 //
 include { MGNIFY                         } from '../subworkflows/local/mgnify'
 include { LOCAL_DATA                     } from '../subworkflows/local/local_data'
@@ -90,6 +90,11 @@ workflow SIEVE {
         ch_pre_assembly = DIAMOND.out.map { row -> [row[0], row[1], row[2], row[3]] }
         //ch_pre_assembly.view()
 
+        // Optional summary file
+        ch_diamond_summary = DIAMOND.out.map { row -> row[4] }
+            .collectFile(name: 'Diamond_summary.tsv', newLine: false, storeDir: params.resultsDir)
+
+
     }
     else {
         ch_pre_assembly = ch_reads
@@ -129,6 +134,11 @@ workflow SIEVE {
     
     //MODULE: CONTIG_COVERAGE (BWA)
     CONTIGS_COVERAGE(ch_contigs)
+
+    ch_coverage_filtered = CONTIGS_COVERAGE.out.filter { tuple ->
+        def abundance = tuple[4]?.toFile()
+        abundance != null && abundance.exists()
+    }
 
     //MODULE: MAXBIN2, CONCOCT and DASTOOL - BINNING
     if (!params.nomaxbin2 && !params.noconcoct){
