@@ -1,7 +1,7 @@
 
 sample,read_1,read_2,experiment,biome
-AD_DNF,data/AD_DNF_1.fastq.gz,data/AD_DNF_2.fastq.gz,metagenomic,aquatic
-AH_DNF,data/AH_DNF_1.fastq.gz,data/AH_DNF_2.fastq.gz,metagenomic,soil
+AD_DNF,data/AD_DNF_1.fasta.gz,data/AD_DNF_2.fasta.gz,metagenomic,aquatic
+AH_DNF,data/AH_DNF_1.fasta.gz,data/AH_DNF_2.fasta.gz,metagenomic,soil
 
     ch_bins = BIN_QUALITY_ANNOTATION.out.tuple_out.map{ row -> [row[0], row[1], row[2], row[3], row[4]] }
         | branch { accession, experiment, lineage, bin, quality ->

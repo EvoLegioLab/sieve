@@ -27,7 +27,8 @@ process ASSEMBLY {
         }
         else if (params.assembler == "Spades") {
             run_script = """
-            echo "Spades assembler not implemented yet"
+            spades.py -s "$reads" -o spades_out --only-assembler
+            mv spades_out/scaffolds.fasta "${accession}_assembly_MG.fasta"
             """
         }
     }

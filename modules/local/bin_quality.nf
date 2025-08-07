@@ -18,8 +18,8 @@
     bin_name = bin.baseName
     """
     cp "${bin}" "${bin_name}.fna"
-    
-    #Execute miComplete
+
+    # Execute miComplete
     miComplete "${bin_name}.fna" --format 'fna' --hmms Bact105 > "${bin_name}_bins_stats_quality.tab"
 
     bin_lenght=\$(awk 'NR>3 { print \$2 }' "${bin_name}_bins_stats_quality.tab")
@@ -38,6 +38,7 @@
         }
     ' "${bin_name}_bins_stats_quality.tab")
 
-    prep_summary="stats"
+    echo "[BIN_QUALITY_ANNOTATION] Bin: ${bin_name} | Quality: \$quality | Completeness: \$bin_completeness | Redundancy: \$bin_redundancy | Contigs: \$bin_nbcontigs"
     """
+
 }

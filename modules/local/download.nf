@@ -8,7 +8,7 @@ process DOWNLOAD {
     val outputDir
 
     output:
-    tuple val(accession), val(experiment), val(biome), path('*.fastq.gz')
+    tuple val(accession), val(experiment), val(biome), path('*.fasta.gz')
 
     script:
     """
@@ -49,7 +49,7 @@ process DOWNLOAD {
             print(f"DEBUG: Found download entry - label: '{download.description.label}', format: '{download.file_format.name}', alias: '{download.alias}'")
             if label and download.description.label == label and download.file_format.name == 'FASTA':
                 try:
-                    local_file = f"{download.alias}.fastq.gz"
+                    local_file = f"{download.alias}.fasta.gz"
                     print(f"DEBUG: Downloading file '{download.alias}' for accession '{accession}' to '{local_file}'")
                     urlretrieve(download.links.self.url, local_file)
                     if os.path.exists(local_file):
@@ -64,7 +64,7 @@ process DOWNLOAD {
             print(f"WARNING: No matching files downloaded for accession '{accession}'. Nothing to concatenate.")
         else:
             try:
-                output_file = f"{accession}.fastq.gz"
+                output_file = f"{accession}.fasta.gz"
                 print(f"DEBUG: Concatenating {len(file_list)} files into '{output_file}'")
                 cat_command = "cat {} > {}".format(" ".join(file_list), output_file)
                 ret = os.system(cat_command)

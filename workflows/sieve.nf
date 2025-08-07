@@ -37,6 +37,7 @@ include { LOCAL_DATA                     } from '../subworkflows/local/local_dat
 
 include { DIAMOND_DB                     } from '../modules/local/diamond_db'
 include { DIAMOND                        } from '../modules/local/diamond'
+include { DIAMOND_ASSEMBLY               } from '../modules/local/diamond_assembly'
 include { ASSEMBLY as ASSEMBLY_AS        } from '../modules/local/assembly'
 include { ASSEMBLY as ASSEMBLY_MG        } from '../modules/local/assembly'
 include { CONTIGS_ANNOTATION             } from '../modules/local/contigs_annotation'
@@ -79,13 +80,13 @@ workflow SIEVE {
     //MODULE: Diamond
 
     if (!params.nodiamond){
-	
-	// Define input channel
-	fasta_files_ch = Channel.fromPath("${params.genes}/*.fasta", checkIfExists: true).collect()
 
-	// Use it in the diamond_db process
-	DIAMOND_DB(fasta_files_ch)
- 
+        // Define input channel
+        fasta_files_ch = Channel.fromPath("${params.genes}/*.fasta", checkIfExists: true).collect()
+
+        // Use it in the diamond_db process
+        DIAMOND_DB(fasta_files_ch)
+
         DIAMOND(ch_reads, DIAMOND_DB.out, params.cpus, params.diamond_min_align_reads)
         ch_pre_assembly = DIAMOND.out.map { row -> [row[0], row[1], row[2], row[3]] }
         //ch_pre_assembly.view()
@@ -107,7 +108,7 @@ workflow SIEVE {
             metagenomic: it[1] == "metagenomic"
             assembly: it[1] == "assembly"
         }
-        
+
     ASSEMBLY_MG ( ch_branch_assembly.metagenomic, params.min_contig_len, params.k_step, params.k_min)
     ASSEMBLY_AS ( ch_branch_assembly.assembly, params.min_contig_len, params.k_step, params.k_min)
 
@@ -130,8 +131,8 @@ workflow SIEVE {
     ch_contigs = ch_contigs.combine(ch_reads, by: [0,1,2])
 
     //MODULE: CAT (contigs classification)
-    CAT(ch_contigs,params.cat_db, params.cat_taxonomy)
-    
+    CAT(ch_contigs, params.cat_db, params.cat_taxonomy)
+
     //MODULE: CONTIG_COVERAGE (BWA)
     CONTIGS_COVERAGE(ch_contigs)
 
@@ -161,12 +162,12 @@ workflow SIEVE {
         selected_channel = ch_maxbin2
     }
     if (params.nomaxbin2 && !params.noconcoct){
-        ch_concoct = CONCOCT(CONTIGS_COVERAGE.out, params.chunk_size, params.overlap_size) 
+        ch_concoct = CONCOCT(CONTIGS_COVERAGE.out, params.chunk_size, params.overlap_size)
         selected_channel = ch_concoct.map { row -> [row[0], row[1], row[2], row[4]] }
     }
 
     //MODULE: BIN_QUALITY_ANNOTATION (miComplete)
-    BIN_QUALITY_ANNOTATION(selected_channel.transpose(),params.completeness, params.redundancy)
+    BIN_QUALITY_ANNOTATION(selected_channel.transpose(), params.completeness, params.redundancy)
 
     ch_bins = BIN_QUALITY_ANNOTATION.out.tuple_out
         | branch {
@@ -174,9 +175,39 @@ workflow SIEVE {
             bad: it[4] == "bad_quality"
         }
 
+    ch_bins.good.view { it -> "Good BIN: ${it[5]} (${it[3]}) | Quality: ${it[4]}" }
+
+    // Prepare bins input for DIAMOND_ASSEMBLY
+    def diamond_assembly_input
+    if (!params.class_all_bins) {
+        diamond_assembly_input = ch_bins.good.transpose()
+    } else {
+        diamond_assembly_input = BIN_QUALITY_ANNOTATION.out.tuple_out.transpose()
+    }
+
+    // Run DIAMOND_ASSEMBLY on final bins after binning and filtering
+    if (!params.nodiamond) {
+        DIAMOND_ASSEMBLY(diamond_assembly_input, DIAMOND_DB.out, params.cpus)
+
+        // Collect DIAMOND_ASSEMBLY .tsv output
+        DIAMOND_ASSEMBLY.out.map { it[4] }
+            .collectFile(name: 'Diamond_assembly_summary.tsv', newLine: false, storeDir: params.resultsDir)
+
+        // Logging filtered bins count
+        def bins_before = diamond_assembly_input.count()
+        def bins_after = DIAMOND_ASSEMBLY.out.count()
+
+        diamond_assembly_input = DIAMOND_ASSEMBLY.out.map { it[0..3] }
+
+        bins_before.combine(bins_after).view { pair ->
+            def (before, after) = pair
+            log.info "DIAMOND_ASSEMBLY filtering: ${before - after} of ${before} bins removed due to too few DIAMOND hits."
+        }
+    }
+
     //MODULE: BIN CLASSIFICATION (BAT)
-    if (!params.class_all_bins){
-        BAT(ch_bins.good.transpose().combine(CAT.out.classification, by: [0]), params.cat_db, params.cat_taxonomy, params.f)
+    if (!params.class_all_bins) {
+        BAT(diamond_assembly_input.combine(CAT.out.classification, by: [0]), params.cat_db, params.cat_taxonomy, params.f)
     }
     else {
         BAT(BIN_QUALITY_ANNOTATION.out.tuple_out.transpose().combine(CAT.out.classification, by: [0]), params.cat_db, params.cat_taxonomy, params.f)
@@ -185,7 +216,7 @@ workflow SIEVE {
     ch_stats = BAT.out.splitCsv(header: true)
         | map { row -> [row.bin_name, row.superkingdom, row.phylum, row.class, row.order, row.family, row.genus, row.species]}
         | combine(BIN_QUALITY_ANNOTATION.out.bin_stat, by: [0])
-    
+
     //MODULE: STATS (Producing the final output file)
     STATS(ch_stats).collectFile(name: 'results.tsv', sort: true, storeDir: params.resultsDir, skip: 1, keepHeader: true)
 
