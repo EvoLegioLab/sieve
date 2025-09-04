@@ -13,17 +13,23 @@ process CAT {
 
     script:
     """
-    #Run classification of contigs
-    CAT contigs -c "$contig" -d "$cat_db" -t "$cat_taxonomy" -n "$task.cpus" -o "$accession"
+    # Prepare contigs: decompress only if gzip magic number detected
+    if [[ \$(head -c 2 "$contig" | od -An -tx1 | tr -d ' ') == "1f8b" ]]; then
+        gunzip -c "$contig" > ${accession}.fasta
+    else
+        cp "$contig" ${accession}.fasta
+    fi
 
-    #Add official name
+    # Run classification of contigs
+    CAT contigs -c ${accession}.fasta -d "$cat_db" -t "$cat_taxonomy" -n "$task.cpus" -o "$accession"
+
+    # Add official names
     CAT add_names --only_official -i "$accession".contig2classification.txt -t "$cat_taxonomy" -o "$accession"classification_official_names.txt
 
-    #Add non-official name
+    # Add non-official names
     CAT add_names -i "$accession".contig2classification.txt -t "$cat_taxonomy" -o "$accession"classification_names.txt
 
-    #summarize results
-    CAT summarise -c "$contig" -i "$accession"classification_official_names.txt -o "$accession"classification_summary.txt
-    
+    # Summarize results
+    CAT summarise -c ${accession}.fasta -i "$accession"classification_official_names.txt -o "$accession"classification_summary.txt
     """
 }

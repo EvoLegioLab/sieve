@@ -13,7 +13,10 @@ process FETCH_PAGE {
     """
     #!/usr/bin/env python3
 
-    import csv, requests, time, sys
+    import csv
+    import requests
+    import time
+    import sys
 
     url = "$page_url"
     page_number = url.split("page=")[-1].split("&")[0] if "page=" in url else "1"
@@ -46,10 +49,19 @@ process FETCH_PAGE {
     def fetch_and_write(url, output_file, retries=20, delay=10):
         try:
             response = retry_get(url)
-            data = response.json().get("data", [])
+            try:
+                data = response.json().get("data", [])
+            except ValueError as e:
+                sys.stderr.write(f"Failed to parse JSON from {url}: {e}\\n")
+                sys.stderr.write(f"Response content: {response.text}\\n")
+                sys.exit(1)
         except Exception as e:
-            sys.stderr.write(f"Failed to fetch or parse data from {url}: {e}\\n")
+            sys.stderr.write(f"Failed to fetch data from {url}: {e}\\n")
             sys.exit(1)
+
+        # Normalize single-object responses into a list
+        if isinstance(data, dict):
+            data = [data]
 
         with open(output_file, mode='w', newline='') as csvfile:
             fieldnames = ["accession", "version", "experiment", "biome"]
@@ -57,17 +69,20 @@ process FETCH_PAGE {
             writer.writeheader()
 
             for entry in data:
-                attributes = entry.get("attributes", {})
-                relationships = entry.get("relationships", {})
-                sample_id = relationships.get("sample", {}).get("data", {}).get("id")
+                if isinstance(entry, dict):
+                    attributes = entry.get("attributes", {})
+                    relationships = entry.get("relationships", {})
+                    sample_id = relationships.get("sample", {}).get("data", {}).get("id")
 
-                row = {
-                    "accession": attributes.get("accession", "N/A"),
-                    "version": attributes.get("pipeline-version", "N/A"),
-                    "experiment": attributes.get("experiment-type", "N/A"),
-                    "biome": fetch_sample_biome(sample_id) if sample_id else "N/A"
-                }
-                writer.writerow(row)
+                    row = {
+                        "accession": attributes.get("accession", "N/A"),
+                        "version": attributes.get("pipeline-version", "N/A"),
+                        "experiment": attributes.get("experiment-type", "N/A"),
+                        "biome": fetch_sample_biome(sample_id) if sample_id else "N/A"
+                    }
+                    writer.writerow(row)
+                else:
+                    sys.stderr.write(f"Skipping invalid entry: {entry}\\n")
 
     fetch_and_write(url, output_file)
     """

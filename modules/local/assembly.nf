@@ -16,7 +16,11 @@ process ASSEMBLY {
 
     if (experiment == "assembly") {
         run_script = """
-        mv "$reads" "${accession}_assembly_AS.fasta"
+        if [[ "$reads" == *.gz ]]; then
+            gunzip -c "$reads" > "${accession}_assembly_AS.fasta"
+        else
+            cp "$reads" "${accession}_assembly_AS.fasta"
+        fi
         """
     } else {
         if (params.assembler == "Megahit") {
