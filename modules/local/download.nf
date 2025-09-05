@@ -17,6 +17,7 @@ process DOWNLOAD {
 
     import os
     from urllib.request import urlretrieve
+    from urllib.error import HTTPError
     from jsonapi_client import Session
 
     API_BASE = "https://www.ebi.ac.uk/metagenomics/api/v1"
@@ -35,7 +36,7 @@ process DOWNLOAD {
             label = None
 
         print(f"DEBUG: Starting download for accession '{accession}' with experiment type '{experiment}'")
-        print(f"DEBUG: Looking for files with label '{label}' and format 'FASTA'")
+        print(f"DEBUG: Looking for files with label '{label}' and format 'FASTA' or 'FASTQ'")
 
         file_list = []
         try:
@@ -47,16 +48,22 @@ process DOWNLOAD {
 
         for download in downloads:
             print(f"DEBUG: Found download entry - label: '{download.description.label}', format: '{download.file_format.name}', alias: '{download.alias}'")
-            if label and download.description.label == label and download.file_format.name == 'FASTA':
+            if label and download.description.label == label and download.file_format.name in ('FASTA', 'FASTQ'):
+                local_file = download.alias  # keep original name & extension
                 try:
-                    local_file = f"{download.alias}.fasta.gz"
-                    print(f"DEBUG: Downloading file '{download.alias}' for accession '{accession}' to '{local_file}'")
+                    print(f"DEBUG: Preparing to download '{download.alias}' for accession '{accession}'")
+                    print(f"DEBUG: Download URL: {download.links.self.url}")
                     urlretrieve(download.links.self.url, local_file)
                     if os.path.exists(local_file):
                         print(f"DEBUG: Successfully downloaded '{local_file}'")
                         file_list.append(local_file)
                     else:
                         print(f"WARNING: File '{local_file}' does not exist after download attempt")
+                except HTTPError as he:
+                    if he.code == 404:
+                        print(f"WARNING: Skipping file '{download.alias}' due to HTTP 404 Not Found")
+                    else:
+                        print(f"ERROR: HTTP error downloading file '{download.alias}': {he}")
                 except Exception as e:
                     print(f"ERROR: Failed to download file '{download.alias}' for accession '{accession}': {e}")
 
@@ -91,6 +98,6 @@ process DOWNLOAD {
         except Exception as e:
             print(f"ERROR: Could not open session or complete downloads for accession '{accession}': {e}")
 
-        print("DEBUG: Download process finished for accession '{accession}'")
+        print(f"DEBUG: Download process finished for accession '{accession}'")
     """
 }
