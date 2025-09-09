@@ -186,7 +186,7 @@ workflow SIEVE {
     }
 
     // Run DIAMOND_ASSEMBLY on final bins after binning and filtering
-    if (!params.nodiamond) {
+    if (!params.nodiamond_assembly) {
         DIAMOND_ASSEMBLY(diamond_assembly_input, DIAMOND_DB.out, params.cpus)
 
         // Collect DIAMOND_ASSEMBLY .tsv output
