@@ -16,8 +16,7 @@ process DOWNLOAD {
     # -*- coding: utf-8 -*-
 
     import os
-    from urllib.request import urlretrieve
-    from urllib.error import HTTPError
+    import requests
     from jsonapi_client import Session
 
     API_BASE = "https://www.ebi.ac.uk/metagenomics/api/v1"
@@ -40,6 +39,9 @@ process DOWNLOAD {
 
         file_list = []
         try:
+            api_url = f"{API_BASE}/analyses/{accession}/downloads"
+            print(f"DEBUG: Accessing API endpoint: {api_url}")
+
             downloads = list(session.iterate(f"analyses/{accession}/downloads"))
             print(f"DEBUG: Found {len(downloads)} download entries for accession {accession}")
         except Exception as e:
@@ -53,17 +55,21 @@ process DOWNLOAD {
                 try:
                     print(f"DEBUG: Preparing to download '{download.alias}' for accession '{accession}'")
                     print(f"DEBUG: Download URL: {download.links.self.url}")
-                    urlretrieve(download.links.self.url, local_file)
-                    if os.path.exists(local_file):
-                        print(f"DEBUG: Successfully downloaded '{local_file}'")
-                        file_list.append(local_file)
+
+                    headers = {"User-Agent": "Mozilla/5.0 (compatible; SIEVE/1.0)"}
+                    response = requests.get(download.links.self.url, headers=headers, stream=True)
+
+                    if response.status_code == 200:
+                        with open(local_file, "wb") as f:
+                            for chunk in response.iter_content(chunk_size=8192):
+                                f.write(chunk)
+                        if os.path.exists(local_file):
+                            print(f"DEBUG: Successfully downloaded '{local_file}'")
+                            file_list.append(local_file)
+                        else:
+                            print(f"WARNING: File '{local_file}' does not exist after download attempt")
                     else:
-                        print(f"WARNING: File '{local_file}' does not exist after download attempt")
-                except HTTPError as he:
-                    if he.code == 404:
-                        print(f"WARNING: Skipping file '{download.alias}' due to HTTP 404 Not Found")
-                    else:
-                        print(f"ERROR: HTTP error downloading file '{download.alias}': {he}")
+                        print(f"ERROR: Failed to download '{local_file}'. HTTP {response.status_code}")
                 except Exception as e:
                     print(f"ERROR: Failed to download file '{download.alias}' for accession '{accession}': {e}")
 
