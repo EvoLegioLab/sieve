@@ -32,16 +32,17 @@ process ADAPTERREMOVAL {
           | gzip > ${accession}_trimSE.fasta.gz
         """
     } else {
-        def read1 = reads[0]
-        def read2 = reads[1]
+        // Just rename these variables, don’t redeclare `reads`
+        def r1 = reads[0]
+        def r2 = reads[1]
 
         """
         #!/usr/bin/env bash
         set -euo pipefail
 
         AdapterRemoval \\
-            --file1 ${read1} \\
-            --file2 ${read2} \\
+            --file1 ${r1} \\
+            --file2 ${r2} \\
             $args \\
             $list \\
             --basename $accession \\
